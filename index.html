@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="bn" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#059669">
+    <meta name="description" content="CashTrace - পার্সোনাল ফাইন্যান্স ও স্মার্ট ট্র্যাকার">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="./icon-192.png" type="image/png">
+    <title>CashTrace - পার্সোনাল ফাইন্যান্স ও স্মার্ট ট্র্যাকার</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js for Dynamic Visual Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+        /* Printable Styles for PDF Export */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableReportArea, #printableReportArea * {
+                visibility: visible;
+            }
+            #printableReportArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+                box-shadow: none !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col min-h-screen transition-colors duration-200">
+
+    <!-- LOCAL PIN LOCK OVERLAY -->
+    <div id="pinLockOverlay" class="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl max-w-xs w-full text-center space-y-6 border border-slate-200 dark:border-slate-700 shadow-2xl">
+            <div class="w-16 h-16 rounded-2xl bg-brand-500/10 text-brand-500 mx-auto flex items-center justify-center text-3xl border border-brand-500/20">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">অ্যাপটি সিকিউর করা আছে</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">প্রবেশ করতে ৪ ডিজিটের পিন দিন</p>
+            </div>
+            <input type="password" maxlength="4" id="pinInput" class="w-36 text-center text-2xl font-mono tracking-widest py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-brand-600 dark:text-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500 mx-auto block">
+            <button onclick="unlockAppWithPin()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-brand-600/30">
+                আনলক করুন
+            </button>
+            <p id="pinErrorMsg" class="text-xs text-rose-500 hidden font-semibold">ভুল পিন কোড! আবার চেষ্টা করুন</p>
+        </div>
+    </div>
+
+    <!-- TOP BAR NAVIGATION HEADER -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+            <!-- BRAND HOME BUTTON -->
+            <button onclick="switchTab('dashboard')" class="flex items-center gap-2.5 focus:outline-none group">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white text-xl font-bold shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div class="text-left hidden sm:block">
+                    <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight leading-none group-hover:text-brand-600 transition-colors">CashTrace</h1>
+                    <span class="text-[11px] text-brand-600 dark:text-brand-400 font-semibold">স্মার্ট পার্সোনাল ফাইন্যান্স</span>
+                </div>
+            </button>
+
+            <!-- DESKTOP TOP NAVIGATION MENU (Hidden on small mobile) -->
+            <nav class="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+                <button onclick="switchTab('dashboard')" id="top-nav-dashboard" class="top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 shadow-sm">
+                    <i class="fa-solid fa-house mr-1"></i> ড্যাশবোর্ড
+                </button>
+                <button onclick="switchTab('input')" id="top-nav-input" class="top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 dark:text-slate-300 hover:text-brand-600">
+                    <i class="fa-solid fa-circle-plus text-emerald-500 mr-1"></i> নতুন এন্ট্রি
+                </button>
+                <button onclick="switchTab('analytics')" id="top-nav-analytics" class="top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 dark:text-slate-300 hover:text-brand-600">
+                    <i class="fa-solid fa-chart-line text-blue-500 mr-1"></i> রিপোর্ট
+                </button>
+                <button onclick="switchTab('savings')" id="top-nav-savings" class="top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 dark:text-slate-300 hover:text-brand-600">
+                    <i class="fa-solid fa-piggy-bank text-amber-500 mr-1"></i> সেভিংস
+                </button>
+            </nav>
+
+            <!-- CONTROLS & UTILITIES -->
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <!-- Extended Month Selector -->
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-calendar-days text-brand-600 dark:text-brand-400 absolute left-2.5 text-xs pointer-events-none"></i>
+                    <select id="monthPicker" onchange="handleMonthChange(this.value)" class="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl pl-8 pr-3 py-2 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none transition-all">
+                        <!-- Options generated via JavaScript -->
+                    </select>
+                </div>
+
+                <!-- Backup JSON Button -->
+                <button onclick="exportBackupJSON()" title="ডাটা ব্যাকআপ নিন (JSON)" class="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden lg:inline">ব্যাকআপ</span>
+                </button>
+
+                <!-- Restore JSON Button -->
+                <label title="ডাটা রিস্টোর করুন (JSON)" class="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer">
+                    <i class="fa-solid fa-upload"></i>
+                    <span class="hidden lg:inline">রিস্টোর</span>
+                    <input type="file" id="importBackupInput" accept=".json" onchange="importBackupJSON(event)" class="hidden">
+                </label>
+
+                <!-- Security Pin Lock Status Button -->
+                <button onclick="togglePinLockState()" id="pinLockStatusBtn" title="পিন সিকিউরিটি সেটিংস" class="p-2 text-slate-600 dark:text-slate-300 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition-colors">
+                    <i class="fa-solid fa-lock-open text-xs" id="pinLockIcon"></i>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button onclick="toggleDarkMode()" title="থিম পরিবর্তন" class="p-2 text-slate-600 dark:text-slate-300 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition-colors">
+                    <i class="fa-solid fa-moon text-xs dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-xs hidden dark:inline text-amber-400"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- NOTIFICATION ALERT POPUP -->
+    <div id="toastNotification" class="fixed top-16 right-4 z-50 transform translate-x-full transition-transform duration-300 ease-in-out bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3">
+        <i class="fa-solid fa-circle-check text-lg"></i>
+        <span id="toastMessage" class="text-sm font-medium">অপারেশন সফল হয়েছে!</span>
+    </div>
+
+    <!-- MAIN MULTI-TAB CONTENT AREA -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 pb-24 md:pb-8">
+
+        <!-- ================= TAB 1: DASHBOARD ================= -->
+        <section id="tab-dashboard" class="tab-page space-y-6">
+            <!-- Welcome Banner -->
+            <div class="bg-gradient-to-r from-brand-700 via-brand-600 to-emerald-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                    <div>
+                        <span class="text-brand-100 text-xs font-semibold uppercase tracking-wider">মাসিক ড্যাশবোর্ড</span>
+                        <h2 class="text-2xl sm:text-3xl font-bold mt-1" id="dashMonthTitle">নভেম্বর ২০২৬</h2>
+                        <p class="text-brand-100 text-sm mt-1">আপনার সমস্ত আয় ও খরচের নির্ভুল চিত্র এখানে দেখে নিন</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="switchTab('input')" class="bg-white text-brand-700 hover:bg-brand-50 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-plus-circle"></i> নতুন লেনদেন
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Total Income Card -->
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-semibold">মাসিক মোট আয়</span>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-arrow-down-left"></i>
+                        </div>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white" id="statTotalIncome">৳ ০</div>
+                    <span class="text-[11px] text-emerald-600 font-medium" id="statIncomeCount">০ টি আয়ের এন্ট্রি</span>
+                </div>
+
+                <!-- Total Expense Card -->
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-semibold">মাসিক মোট খরচ</span>
+                        <div class="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-arrow-up-right"></i>
+                        </div>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white" id="statTotalExpense">৳ ০</div>
+                    <span class="text-[11px] text-rose-600 font-medium" id="statExpenseCount">০ টি খরচের এন্ট্রি</span>
+                </div>
+
+                <!-- Net Remaining Balance Card -->
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-semibold">অবশিষ্ট নেট ব্যালেন্স</span>
+                        <div class="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-piggy-bank"></i>
+                        </div>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white" id="statNetBalance">৳ ০</div>
+                    <span class="text-[11px] text-slate-500 font-medium">আয় থেকে মোট খরচ বাদ</span>
+                </div>
+
+                <!-- Daily Target Card -->
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                        <span class="text-xs font-semibold">দৈনিক খরচের টার্গেট</span>
+                        <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-bullseye"></i>
+                        </div>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white" id="statDailyTarget">৳ ০ / দিন</div>
+                    <span class="text-[11px] text-sky-600 font-medium" id="statRemainingDaysText">অবশিষ্ট দিন হিসাবের পরামর্শ</span>
+                </div>
+            </div>
+
+            <!-- Monthly Budget Progress & Spending Limits Bar -->
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-bold text-slate-800 dark:text-slate-200 text-sm sm:text-base">মাসিক বাজেট সীমা</h3>
+                        <span id="budgetHealthBadge" class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">স্বাভাবিক</span>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-500">
+                        ব্যবহার: <span id="budgetUsagePercent" class="text-slate-900 dark:text-white font-bold">০%</span>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-100 dark:bg-slate-700 h-3 rounded-full overflow-hidden">
+                    <div id="budgetProgressBar" class="bg-brand-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>বাজেট সীমা: <strong id="budgetCapLimitText">৳ ০</strong></span>
+                    <button onclick="promptSetBudget()" class="text-brand-600 dark:text-brand-400 hover:underline font-medium">বাজেট চেঞ্জ করুন</button>
+                </div>
+            </div>
+
+            <!-- Quick Action Links -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <button onclick="switchTab('analytics')" class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 hover:border-brand-500 transition-colors text-left">
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">অ্যানালিটিক্স</h4>
+                        <span class="text-xs text-slate-400">পাই-চার্ট ও রিপোর্ট</span>
+                    </div>
+                </button>
+                <button onclick="triggerPrintPDF()" class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 hover:border-brand-500 transition-colors text-left">
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-file-pdf"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">PDF প্রিন্ট</h4>
+                        <span class="text-xs text-slate-400">স্টেটমেন্ট রিপোর্ট</span>
+                    </div>
+                </button>
+                <button onclick="exportToColorfulExcel()" class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 hover:border-brand-500 transition-colors text-left col-span-2 sm:col-span-1">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">এক্সেল রিপোর্ট</h4>
+                        <span class="text-xs text-slate-400">কালারফুল স্প্রেডশীট</span>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: INPUT (INCOME & EXPENSE FORM) ================= -->
+        <section id="tab-input" class="tab-page hidden max-w-2xl mx-auto space-y-6">
+            <!-- Input Form Type Segmented Switcher -->
+            <div class="bg-slate-200 dark:bg-slate-800 p-1.5 rounded-2xl flex items-center gap-1">
+                <button onclick="switchInputForm('expense')" id="btnFormExpense" class="flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-white dark:bg-slate-700 text-rose-600 shadow-sm">
+                    <i class="fa-solid fa-minus-circle"></i> খরচ যুক্ত করুন
+                </button>
+                <button onclick="switchInputForm('income')" id="btnFormIncome" class="flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-emerald-600">
+                    <i class="fa-solid fa-plus-circle"></i> আয় জমা করুন
+                </button>
+            </div>
+
+            <!-- EXPENSE FORM -->
+            <div id="formSectionExpense" class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <h3 class="font-bold text-lg text-rose-600 flex items-center gap-2">
+                        <i class="fa-solid fa-receipt"></i> নতুন খরচ যুক্ত করুন (Add Expense)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">আপনার দৈনন্দিন খরচ তালিকাভুক্ত করুন</p>
+                </div>
+
+                <form id="expenseForm" onsubmit="handleExpenseSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">খরচের বিবরণ / নাম *</label>
+                        <input type="text" id="expTitle" required placeholder="যেমন: বাস ভাড়া, দুপুরের খাবার, বই কেনা" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">পরিমাণ (টাকা) *</label>
+                            <input type="number" id="expAmount" required min="1" step="any" placeholder="যেমন: ২৫০" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">খরচের প্রধান খাত *</label>
+                            <select id="expCategory" required class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer">
+                                <option value="🛒 কাঁচা বাজার">🛒 কাঁচা বাজার</option>
+                                <option value="🍱 খাবার ও নাস্তা">🍱 খাবার ও নাস্তা</option>
+                                <option value="🚌 যাতায়াত & রাইড">🚌 যাতায়াত & রাইড</option>
+                                <option value="🏠 বাসা ভাড়া & বিল">🏠 বাসা ভাড়া & বিল</option>
+                                <option value="📚 পড়াশোনা & বই">📚 পড়াশোনা & বই</option>
+                                <option value="💊 চিকিৎসা & ওষুধ">💊 চিকিৎসা & ওষুধ</option>
+                                <option value="👕 জামাকাপড় & কেনাকাটা">👕 জামাকাপড় & কেনাকাটা</option>
+                                <option value="🎬 বিনোদন & রিচার্জ">🎬 বিনোদন & রিচার্জ</option>
+                                <option value="💡 অন্যান্য">💡 অন্যান্য</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">উপ-খাত / নোট (ঐচ্ছিক)</label>
+                            <input type="text" id="expSubCategory" placeholder="যেমন: সুপারশপ, বন্ধুকে ট্রিট" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">তারিখ *</label>
+                            <input type="date" id="expDate" required class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> খরচ সাবমিট করুন
+                    </button>
+                </form>
+            </div>
+
+            <!-- INCOME FORM -->
+            <div id="formSectionIncome" class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 hidden">
+                <div class="border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <h3 class="font-bold text-lg text-emerald-600 flex items-center gap-2">
+                        <i class="fa-solid fa-money-bill-wave"></i> নতুন আয় যুক্ত করুন (Add Income)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">মাসিক বেতন, পকেট মানি বা অন্যান্য আয় জমা করুন</p>
+                </div>
+
+                <form id="incomeForm" onsubmit="handleIncomeSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">আয়ের উৎস / বিবরণ *</label>
+                        <input type="text" id="incTitle" required placeholder="যেমন: বাবা পাঠিয়েছেন, টিউশন ফি, ফ্রিল্যান্সিং" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">পরিমাণ (টাকা) *</label>
+                            <input type="number" id="incAmount" required min="1" step="any" placeholder="যেমন: ৫০০০" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">আয়ের খাত *</label>
+                            <select id="incCategory" required class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
+                                <option value="👨‍👩‍👦 অভিভাবক / পকেট মানি">👨‍👩‍👦 অভিভাবক / পকেট মানি</option>
+                                <option value="📚 টিউশনি / কোচিং">📚 টিউশনি / কোচিং</option>
+                                <option value="💼 মাসিক বেতন">💼 মাসিক বেতন</option>
+                                <option value="💻 ফ্রিল্যান্সিং & প্রজেক্ট">💻 ফ্রিল্যান্সিং & প্রজেক্ট</option>
+                                <option value="🎁 উপহার / বোনাস">🎁 উপহার / বোনাস</option>
+                                <option value="🪙 অন্যান্য আয়">🪙 অন্যান্য আয়</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">তারিখ *</label>
+                        <input type="date" id="incDate" required class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> আয় জমা করুন
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: ANALYTICS & REPORTS ================= -->
+        <section id="tab-analytics" class="tab-page hidden space-y-6">
+            <!-- Visual Charts Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Pie Chart Card -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                        <i class="fa-solid fa-chart-pie text-brand-500"></i> খাতভিত্তিক খরচের অনুপাত (Pie Chart)
+                    </h3>
+                    <div class="relative flex-grow flex items-center justify-center min-h-[220px]">
+                        <canvas id="expensePieChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Monthly Summary Stats Card -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between space-y-4">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-emerald-500"></i> ফাইন্যান্সিয়াল সামারি & এক্সপোর্ট
+                    </h3>
+
+                    <div class="space-y-3 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">মোট আয়:</span>
+                            <span class="font-bold text-emerald-600" id="reportSummaryIncome">৳ ০</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">মোট খরচ:</span>
+                            <span class="font-bold text-rose-600" id="reportSummaryExpense">৳ ০</span>
+                        </div>
+                        <div class="border-t border-slate-200 dark:border-slate-600 pt-2 flex justify-between text-base font-bold">
+                            <span class="text-slate-800 dark:text-slate-200">অবশিষ্ট ব্যালেন্স:</span>
+                            <span class="text-brand-600 dark:text-brand-400" id="reportSummaryNet">৳ ০</span>
+                        </div>
+                    </div>
+
+                    <!-- EXPORT BUTTONS CONTAINER -->
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <button onclick="triggerPrintPDF()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+                            <i class="fa-solid fa-file-pdf"></i> 📄 PDF রিপোর্ট
+                        </button>
+                        <button onclick="exportToColorfulExcel()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+                            <i class="fa-solid fa-file-excel"></i> 📊 এক্সেল এক্সপোর্ট
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complete Transactions Table Section -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden space-y-4 p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-brand-600"></i> সকল আয়ের ও খরচের বিস্তারিত তালিকা
+                    </h3>
+                    <input type="text" id="transactionSearch" onkeyup="renderUI()" placeholder="বিবরণ বা খাত দিয়ে খুঁজুন..." class="bg-slate-100 dark:bg-slate-700 border-0 rounded-xl px-4 py-2 text-xs text-slate-800 dark:text-slate-200 w-full sm:w-64 focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-semibold uppercase text-[11px]">
+                            <tr>
+                                <th class="py-3 px-4">টাইপ</th>
+                                <th class="py-3 px-4">তারিখ</th>
+                                <th class="py-3 px-4">বিবরণ</th>
+                                <th class="py-3 px-4">খাত / বিবরণী</th>
+                                <th class="py-3 px-4 text-right">পরিমাণ</th>
+                                <th class="py-3 px-4 text-center">অ্যাকশন</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTableBody" class="divide-y divide-slate-100 dark:divide-slate-700">
+                            <!-- Items populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: SAVINGS GOALS & SETTINGS ================= -->
+        <section id="tab-savings" class="tab-page hidden max-w-3xl mx-auto space-y-6">
+            <!-- Piggy Bank / Savings Goals Section -->
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-piggy-bank text-amber-500"></i> সেভিংস গোল (Piggy Bank Target)
+                        </h3>
+                        <p class="text-xs text-slate-400">শখ বা জরুরি ফান্ডের জন্য টাকা জমানোর টার্গেট তৈরি করুন</p>
+                    </div>
+                    <button onclick="promptCreateSavingsGoal()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> নতুন টার্গেট
+                    </button>
+                </div>
+
+                <div id="savingsGoalsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Goals populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Profile & General Preferences -->
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <h3 class="font-bold text-lg text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <i class="fa-solid fa-gear text-slate-500"></i> অ্যাকাউন্ট ও সিকিউরিটি পিন সেটিংস
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">ব্যবহারকারীর নাম</label>
+                        <input type="text" id="settingUserName" onchange="updateUserProfile('name', this.value)" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">মুদ্রা (Currency)</label>
+                        <select id="settingCurrency" onchange="updateUserProfile('currency', this.value)" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none cursor-pointer">
+                            <option value="৳">৳ (টাকা)</option>
+                            <option value="$">$ (USD)</option>
+                            <option value="€">€ (Euro)</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">অ্যাপ পিন কোড (৪ ডিজিট)</label>
+                        <input type="password" maxlength="4" id="settingPinInput" onchange="updateUserProfile('pin', this.value)" placeholder="যেমন: ১২৩৪" class="w-full sm:w-48 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none font-mono">
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- BOTTOM MOBILE NAVIGATION BAR -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 z-40 py-2 px-4 shadow-lg">
+        <div class="max-w-md mx-auto flex justify-around items-center">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center gap-1 text-brand-600 dark:text-brand-400 font-semibold text-xs">
+                <i class="fa-solid fa-house text-lg"></i>
+                <span>ড্যাশবোর্ড</span>
+            </button>
+            <button onclick="switchTab('input')" id="nav-input" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-brand-600 font-semibold text-xs">
+                <i class="fa-solid fa-circle-plus text-xl text-brand-500"></i>
+                <span>এন্ট্রি</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-brand-600 font-semibold text-xs">
+                <i class="fa-solid fa-chart-line text-lg"></i>
+                <span>রিপোর্ট</span>
+            </button>
+            <button onclick="switchTab('savings')" id="nav-savings" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-brand-600 font-semibold text-xs">
+                <i class="fa-solid fa-piggy-bank text-lg"></i>
+                <span>সেভিংস</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- PRINTABLE PDF MODAL DIALOG CONTAINER -->
+    <div id="pdfModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white text-slate-900 rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative space-y-4 my-8">
+            <div class="flex items-center justify-between border-b pb-3 no-print">
+                <h3 class="font-bold text-lg text-brand-700 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf"></i> মাস ফাইন্যান্সিয়াল রিপোর্ট (PDF Preview)
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="executeBrowserPrint()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow">
+                        <i class="fa-solid fa-print"></i> প্রিন্ট / PDF সেভ করুন
+                    </button>
+                    <button onclick="closePdfModal()" class="text-slate-400 hover:text-slate-700 p-2 text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PRINTABLE REPORT CONTENT AREA -->
+            <div id="printableReportArea" class="bg-white p-6 rounded-xl border border-slate-100 space-y-6">
+                <!-- Header -->
+                <div class="flex justify-between items-start border-b pb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-brand-700">CashTrace Statement</h2>
+                        <p class="text-xs text-slate-500" id="pdfReportMonthTitle">মাসিক স্টেটমেন্ট</p>
+                    </div>
+                    <div class="text-right text-xs text-slate-500">
+                        <p>ব্যবহারকারী: <strong id="pdfUserName" class="text-slate-800">ইউজার</strong></p>
+                        <p>তারিখ: <span id="pdfGeneratedDate">--</span></p>
+                    </div>
+                </div>
+
+                <!-- Total Stats Cards -->
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                        <span class="text-[11px] font-semibold text-emerald-700">মোট আয়</span>
+                        <p class="text-base font-bold text-emerald-700" id="pdfTotalIncome">৳ ০</p>
+                    </div>
+                    <div class="p-3 bg-rose-50 rounded-lg border border-rose-100">
+                        <span class="text-[11px] font-semibold text-rose-700">মোট খরচ</span>
+                        <p class="text-base font-bold text-rose-700" id="pdfTotalExpense">৳ ০</p>
+                    </div>
+                    <div class="p-3 bg-teal-50 rounded-lg border border-teal-100">
+                        <span class="text-[11px] font-semibold text-teal-700">নেট ব্যালেন্স</span>
+                        <p class="text-base font-bold text-teal-700" id="pdfNetBalance">৳ ০</p>
+                    </div>
+                </div>
+
+                <!-- Detailed Tables -->
+                <div class="space-y-4 text-xs">
+                    <div>
+                        <h4 class="font-bold text-slate-700 border-b pb-1 mb-2">১. আয়ের বিবরণী (INCOME DETAILS)</h4>
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-100 text-slate-600 font-semibold">
+                                <tr>
+                                    <th class="p-2">তারিখ</th>
+                                    <th class="p-2">বিবরণ</th>
+                                    <th class="p-2">খাত</th>
+                                    <th class="p-2 text-right">পরিমাণ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pdfIncomeBody" class="divide-y divide-slate-100">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-700 border-b pb-1 mb-2">২. খরচের বিবরণী (EXPENSE DETAILS)</h4>
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-100 text-slate-600 font-semibold">
+                                <tr>
+                                    <th class="p-2">তারিখ</th>
+                                    <th class="p-2">বিবরণ</th>
+                                    <th class="p-2">প্রধান খাত</th>
+                                    <th class="p-2">উপ-খাত/নোট</th>
+                                    <th class="p-2 text-right">পরিমাণ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pdfExpenseBody" class="divide-y divide-slate-100">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t text-center text-[10px] text-slate-400">
+                    Generated dynamically via CashTrace Web App
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTROLLER SCRIPT -->
+    <script>
+        // Global App States
+        window.selectedMonthKey = new Date().toISOString().slice(0, 7);
+        window.monthlyDataStore = JSON.parse(localStorage.getItem('cashtrace_monthly_data_v3')) || {};
+        window.userProfile = JSON.parse(localStorage.getItem('cashtrace_user_profile_v3')) || {
+            name: 'ইউজার',
+            currency: '৳',
+            pin: '',
+            pinLock: false
+        };
+        window.savingsGoals = JSON.parse(localStorage.getItem('cashtrace_savings_goals_v3')) || [];
+        window.expenseChartInstance = null;
+
+        // Initialize Data Store for Selected Month
+        window.initMonthStore = function(monthKey) {
+            if (!window.monthlyDataStore[monthKey]) {
+                window.monthlyDataStore[monthKey] = {
+                    budgetCap: 0,
+                    items: [],
+                    incomeItems: []
+                };
+            }
+        };
+
+        // Save State to LocalStorage
+        window.saveData = function() {
+            localStorage.setItem('cashtrace_monthly_data_v3', JSON.stringify(window.monthlyDataStore));
+            localStorage.setItem('cashtrace_user_profile_v3', JSON.stringify(window.userProfile));
+            localStorage.setItem('cashtrace_savings_goals_v3', JSON.stringify(window.savingsGoals));
+        };
+
+        // Window Load Setup
+        window.addEventListener('DOMContentLoaded', () => {
+            const expDate = document.getElementById('expDate');
+            const incDate = document.getElementById('incDate');
+            if (expDate) expDate.valueAsDate = new Date();
+            if (incDate) incDate.valueAsDate = new Date();
+
+            window.initMonthStore(window.selectedMonthKey);
+            window.populateMonthPicker();
+            window.checkPinLockStatus();
+            window.renderUI();
+        });
+
+        // Tab Switcher Function
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.tab-page').forEach(page => page.classList.add('hidden'));
+            const targetTab = document.getElementById(`tab-${tabId}`);
+            if (targetTab) targetTab.classList.remove('hidden');
+
+            // Bottom Nav Sync
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-brand-600', 'dark:text-brand-400');
+                btn.classList.add('text-slate-400');
+            });
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-brand-600', 'dark:text-brand-400');
+            }
+
+            // Top Nav Sync
+            document.querySelectorAll('.top-nav-btn').forEach(btn => {
+                btn.className = "top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-600 dark:text-slate-300 hover:text-brand-600";
+            });
+            const activeTopBtn = document.getElementById(`top-nav-${tabId}`);
+            if (activeTopBtn) {
+                activeTopBtn.className = "top-nav-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 shadow-sm";
+            }
+
+            if (tabId === 'analytics') {
+                window.renderPieChart();
+            }
+        };
+
+        // Month Picker Generator (Extended to 36 Months)
+        window.populateMonthPicker = function() {
+            const picker = document.getElementById('monthPicker');
+            if (!picker) return;
+            picker.innerHTML = '';
+            const currDate = new Date();
+
+            // Generates 24 past months + current month + 12 future months
+            for (let i = -24; i <= 12; i++) {
+                const d = new Date(currDate.getFullYear(), currDate.getMonth() + i, 1);
+                const monthKey = d.toISOString().slice(0, 7);
+                const monthName = d.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
+                
+                const opt = document.createElement('option');
+                opt.value = monthKey;
+                opt.textContent = monthName;
+                if (monthKey === window.selectedMonthKey) opt.selected = true;
+                picker.appendChild(opt);
+            }
+        };
+
+        window.handleMonthChange = function(newMonth) {
+            window.selectedMonthKey = newMonth;
+            window.initMonthStore(window.selectedMonthKey);
+            window.renderUI();
+        };
+
+        // Form Switcher inside Input Tab
+        window.switchInputForm = function(type) {
+            const expForm = document.getElementById('formSectionExpense');
+            const incForm = document.getElementById('formSectionIncome');
+            const btnExp = document.getElementById('btnFormExpense');
+            const btnInc = document.getElementById('btnFormIncome');
+
+            if (type === 'expense') {
+                expForm.classList.remove('hidden');
+                incForm.classList.add('hidden');
+                btnExp.className = "flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-white dark:bg-slate-700 text-rose-600 shadow-sm";
+                btnInc.className = "flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-emerald-600";
+            } else {
+                incForm.classList.remove('hidden');
+                expForm.classList.add('hidden');
+                btnInc.className = "flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-white dark:bg-slate-700 text-emerald-600 shadow-sm";
+                btnExp.className = "flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-rose-600";
+            }
+        };
+
+        // Expense Form Submission
+        window.handleExpenseSubmit = function(e) {
+            e.preventDefault();
+            const title = document.getElementById('expTitle').value.trim();
+            const amount = parseFloat(document.getElementById('expAmount').value);
+            const category = document.getElementById('expCategory').value;
+            const subcategory = document.getElementById('expSubCategory').value.trim();
+            const date = document.getElementById('expDate').value;
+
+            if (!title || isNaN(amount) || amount <= 0) return;
+
+            window.initMonthStore(window.selectedMonthKey);
+            window.monthlyDataStore[window.selectedMonthKey].items.unshift({
+                id: 'exp_' + Date.now(),
+                title,
+                amount,
+                category,
+                subcategory,
+                date
+            });
+
+            window.saveData();
+            document.getElementById('expenseForm').reset();
+            document.getElementById('expDate').valueAsDate = new Date();
+            window.renderUI();
+            window.showToast('✅ খরচ সফলভাবে জমা হয়েছে!');
+        };
+
+        // Income Form Submission
+        window.handleIncomeSubmit = function(e) {
+            e.preventDefault();
+            const title = document.getElementById('incTitle').value.trim();
+            const amount = parseFloat(document.getElementById('incAmount').value);
+            const category = document.getElementById('incCategory').value;
+            const date = document.getElementById('incDate').value;
+
+            if (!title || isNaN(amount) || amount <= 0) return;
+
+            window.initMonthStore(window.selectedMonthKey);
+            window.monthlyDataStore[window.selectedMonthKey].incomeItems.unshift({
+                id: 'inc_' + Date.now(),
+                title,
+                amount,
+                category,
+                date
+            });
+
+            window.saveData();
+            document.getElementById('incomeForm').reset();
+            document.getElementById('incDate').valueAsDate = new Date();
+            window.renderUI();
+            window.showToast('✅ আয় সফলভাবে জমা হয়েছে!');
+        };
+
+        // Delete Entry
+        window.deleteTransaction = function(id, type) {
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+            if (type === 'income') {
+                store.incomeItems = store.incomeItems.filter(item => item.id !== id);
+            } else {
+                store.items = store.items.filter(item => item.id !== id);
+            }
+            window.saveData();
+            window.renderUI();
+            window.showToast('🗑️ এন্ট্রি ডিলিট করা হয়েছে');
+        };
+
+        // Money Formatter Helper
+        window.formatMoney = function(amount) {
+            return `${window.userProfile.currency || '৳'} ${(amount || 0).toLocaleString('bn-BD')}`;
+        };
+
+        // Main UI Renderer
+        window.renderUI = function() {
+            window.initMonthStore(window.selectedMonthKey);
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+
+            const totalIncome = store.incomeItems.reduce((sum, item) => sum + item.amount, 0);
+            const totalExpense = store.items.reduce((sum, item) => sum + item.amount, 0);
+            const netBalance = totalIncome - totalExpense;
+
+            // Stats Elements
+            const incEl = document.getElementById('statTotalIncome');
+            if (incEl) incEl.innerText = window.formatMoney(totalIncome);
+            const incCntEl = document.getElementById('statIncomeCount');
+            if (incCntEl) incCntEl.innerText = `${store.incomeItems.length} টি আয়ের এন্ট্রি`;
+
+            const expEl = document.getElementById('statTotalExpense');
+            if (expEl) expEl.innerText = window.formatMoney(totalExpense);
+            const expCntEl = document.getElementById('statExpenseCount');
+            if (expCntEl) expCntEl.innerText = `${store.items.length} টি খরচের এন্ট্রি`;
+
+            const netEl = document.getElementById('statNetBalance');
+            if (netEl) netEl.innerText = window.formatMoney(netBalance);
+
+            // Daily Spend Calculation
+            const today = new Date();
+            const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+            const remainingDays = Math.max(1, daysInMonth - today.getDate() + 1);
+            const dailyTarget = netBalance > 0 ? Math.floor(netBalance / remainingDays) : 0;
+
+            const targetEl = document.getElementById('statDailyTarget');
+            if (targetEl) targetEl.innerText = `${window.formatMoney(dailyTarget)} / দিন`;
+
+            // Budget Cap Progress
+            const budgetCap = store.budgetCap || 0;
+            const capEl = document.getElementById('budgetCapLimitText');
+            if (capEl) capEl.innerText = window.formatMoney(budgetCap);
+
+            let usagePercent = budgetCap > 0 ? Math.min(100, Math.round((totalExpense / budgetCap) * 100)) : 0;
+            const usageEl = document.getElementById('budgetUsagePercent');
+            if (usageEl) usageEl.innerText = `${usagePercent}%`;
+            const barEl = document.getElementById('budgetProgressBar');
+            if (barEl) barEl.style.width = `${usagePercent}%`;
+
+            // Report Summaries
+            const rInc = document.getElementById('reportSummaryIncome');
+            if (rInc) rInc.innerText = window.formatMoney(totalIncome);
+            const rExp = document.getElementById('reportSummaryExpense');
+            if (rExp) rExp.innerText = window.formatMoney(totalExpense);
+            const rNet = document.getElementById('reportSummaryNet');
+            if (rNet) rNet.innerText = window.formatMoney(netBalance);
+
+            window.renderTransactionTable();
+            window.renderSavingsGoals();
+
+            // Settings Fields Sync
+            const nameInp = document.getElementById('settingUserName');
+            if (nameInp) nameInp.value = window.userProfile.name || 'ইউজার';
+            const currInp = document.getElementById('settingCurrency');
+            if (currInp) currInp.value = window.userProfile.currency || '৳';
+            const pinInp = document.getElementById('settingPinInput');
+            if (pinInp) pinInp.value = window.userProfile.pin || '';
+        };
+
+        // Render All Transactions Table
+        window.renderTransactionTable = function() {
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+            const tbody = document.getElementById('transactionTableBody');
+            if (!tbody) return;
+
+            const searchInput = document.getElementById('transactionSearch');
+            const search = searchInput ? searchInput.value.toLowerCase() : '';
+
+            let allTx = [
+                ...store.incomeItems.map(i => ({ ...i, txType: 'income' })),
+                ...store.items.map(i => ({ ...i, txType: 'expense' }))
+            ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (search) {
+                allTx = allTx.filter(item => 
+                    item.title.toLowerCase().includes(search) || 
+                    item.category.toLowerCase().includes(search)
+                );
+            }
+
+            if (allTx.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">কোনো লেনদেনের তথ্য পাওয়া যায়নি</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = allTx.map(tx => {
+                const isInc = tx.txType === 'income';
+                return `
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
+                        <td class="py-3 px-4">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isInc ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'}">
+                                ${isInc ? 'আয়' : 'খরচ'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-mono text-xs text-slate-500">${tx.date}</td>
+                        <td class="py-3 px-4 font-semibold">${tx.title}</td>
+                        <td class="py-3 px-4 text-slate-500">${tx.category} ${tx.subcategory ? `<span class="text-xs text-slate-400">(${tx.subcategory})</span>` : ''}</td>
+                        <td class="py-3 px-4 text-right font-bold ${isInc ? 'text-emerald-600' : 'text-rose-600'}">${window.formatMoney(tx.amount)}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="deleteTransaction('${tx.id}', '${tx.txType}')" class="text-slate-400 hover:text-rose-600 p-1.5 transition-colors">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        // Render Pie Chart
+        window.renderPieChart = function() {
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+            const expenseItems = store.items || [];
+            
+            const categoryTotals = {};
+            expenseItems.forEach(item => {
+                categoryTotals[item.category] = (categoryTotals[item.category] || 0) + item.amount;
+            });
+
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+
+            const canvasEl = document.getElementById('expensePieChart');
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (window.expenseChartInstance) {
+                window.expenseChartInstance.destroy();
+            }
+
+            if (labels.length === 0) {
+                ctx.clearRect(0, 0, 300, 300);
+                return;
+            }
+
+            window.expenseChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#10b981', '#f43f5e', '#8b5cf6', '#06b6d4', 
+                            '#f59e0b', '#ec4899', '#3b82f6', '#64748b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        };
+
+        // Budget Limit Prompt
+        window.promptSetBudget = function() {
+            const currentCap = window.monthlyDataStore[window.selectedMonthKey].budgetCap || 0;
+            const newCap = prompt('এই মাসের জন্য সর্বোচ্চ কতো টাকা বাজেটের সিমা রাখতে চান?', currentCap);
+            if (newCap !== null && !isNaN(parseFloat(newCap))) {
+                window.monthlyDataStore[window.selectedMonthKey].budgetCap = parseFloat(newCap);
+                window.saveData();
+                window.renderUI();
+                window.showToast('🎯 নতুন বাজেট সীমা সেভ হয়েছে');
+            }
+        };
+
+        // Savings Goals Logic
+        window.renderSavingsGoals = function() {
+            const container = document.getElementById('savingsGoalsContainer');
+            if (!container) return;
+            if (window.savingsGoals.length === 0) {
+                container.innerHTML = `<div class="col-span-2 text-center py-6 text-slate-400 text-sm">কোনো সেভিংস গোল নেই। নতুন গোল যোগ করতে ওপরের বাটনে ক্লিক করুন!</div>`;
+                return;
+            }
+
+            container.innerHTML = window.savingsGoals.map((goal, idx) => {
+                const percent = Math.min(100, Math.round((goal.saved / goal.target) * 100));
+                return `
+                    <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">${goal.title}</h4>
+                            <span class="text-xs font-bold text-amber-600">${percent}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-600 h-2 rounded-full overflow-hidden">
+                            <div class="bg-amber-500 h-full rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-slate-500 pt-1">
+                            <span>জমা: ${window.formatMoney(goal.saved)}</span>
+                            <span>লক্ষ্য: ${window.formatMoney(goal.target)}</span>
+                        </div>
+                        <div class="pt-2 flex gap-2">
+                            <button onclick="depositToGoal(${idx})" class="flex-1 bg-amber-500 text-white text-xs py-1.5 rounded-lg font-semibold hover:bg-amber-600">+ টাকা জমা</button>
+                            <button onclick="deleteGoal(${idx})" class="text-slate-400 hover:text-rose-500 px-2 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.promptCreateSavingsGoal = function() {
+            const title = prompt('সেভিংস লক্ষ্যের নাম (যেমন: নতুন ফোন, ভ্রমণ):');
+            if (!title) return;
+            const target = parseFloat(prompt('টার্গেট টাকার পরিমাণ:'));
+            if (isNaN(target) || target <= 0) return;
+
+            window.savingsGoals.push({ title, target, saved: 0 });
+            window.saveData();
+            window.renderSavingsGoals();
+            window.showToast('🎯 নতুন সেভিংস গোল যোগ হয়েছে!');
+        };
+
+        window.depositToGoal = function(idx) {
+            const addAmt = parseFloat(prompt('কতো টাকা জমা করতে চান?'));
+            if (!isNaN(addAmt) && addAmt > 0) {
+                window.savingsGoals[idx].saved += addAmt;
+                window.saveData();
+                window.renderSavingsGoals();
+                window.showToast('💰 টাকা জমা করা হয়েছে!');
+            }
+        };
+
+        window.deleteGoal = function(idx) {
+            window.savingsGoals.splice(idx, 1);
+            window.saveData();
+            window.renderSavingsGoals();
+        };
+
+        // Export All App Data as JSON Backup File
+        window.exportBackupJSON = function() {
+            const fullBackup = {
+                monthlyDataStore: window.monthlyDataStore,
+                userProfile: window.userProfile,
+                savingsGoals: window.savingsGoals,
+                exportedAt: new Date().toISOString()
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
+            const dlBtn = document.createElement('a');
+            dlBtn.setAttribute("href", dataStr);
+            dlBtn.setAttribute("download", `cashtrace_backup_${new Date().toISOString().slice(0, 10)}.json`);
+            document.body.appendChild(dlBtn);
+            dlBtn.click();
+            dlBtn.remove();
+            window.showToast('💾 ব্যাকআপ ফাইল ডাউনলোড হয়েছে!');
+        };
+
+        // Restore App Data from JSON Backup File
+        window.importBackupJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed && (parsed.monthlyDataStore || parsed.userProfile)) {
+                        window.monthlyDataStore = parsed.monthlyDataStore || {};
+                        window.userProfile = parsed.userProfile || { name: 'ইউজার', currency: '৳', pin: '', pinLock: false };
+                        window.savingsGoals = parsed.savingsGoals || [];
+                        window.saveData();
+                        window.renderUI();
+                        window.showToast('🎉 ডাটা সফলভাবে রিস্টোর হয়েছে!');
+                    } else {
+                        alert('ভুল ফাইল ফরম্যাট! সঠিক CashTrace ব্যাকআপ ফাইল দিন।');
+                    }
+                } catch (err) {
+                    alert('ফাইল লোড করতে সমস্যা হয়েছে!');
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // PIN Security Lock Functions
+        window.checkPinLockStatus = function() {
+            const overlay = document.getElementById('pinLockOverlay');
+            if (window.userProfile.pinLock && window.userProfile.pin) {
+                if (overlay) overlay.classList.remove('hidden');
+            } else {
+                if (overlay) overlay.classList.add('hidden');
+            }
+            const icon = document.getElementById('pinLockIcon');
+            if (icon) {
+                icon.className = window.userProfile.pinLock ? 'fa-solid fa-lock text-rose-500' : 'fa-solid fa-lock-open';
+            }
+        };
+
+        window.unlockAppWithPin = function() {
+            const pinInp = document.getElementById('pinInput');
+            const errEl = document.getElementById('pinErrorMsg');
+            if (!pinInp) return;
+
+            if (pinInp.value === window.userProfile.pin) {
+                const overlay = document.getElementById('pinLockOverlay');
+                if (overlay) overlay.classList.add('hidden');
+                if (errEl) errEl.classList.add('hidden');
+                pinInp.value = '';
+            } else {
+                if (errEl) errEl.classList.remove('hidden');
+            }
+        };
+
+        window.togglePinLockState = function() {
+            if (!window.userProfile.pin) {
+                alert('লক চালু করার আগে সেটিংসে গিয়ে ৪-ডিজিটের একটি পিন কোড সেভ করুন!');
+                window.switchTab('savings');
+                return;
+            }
+            window.userProfile.pinLock = !window.userProfile.pinLock;
+            window.saveData();
+            window.checkPinLockStatus();
+            window.showToast(window.userProfile.pinLock ? '🔒 সিকিউরিটি পিন লক অ্যাক্টিভ' : '🔓 পিন সিকিউরিটি বন্ধ করা হয়েছে');
+        };
+
+        // PDF Print Helpers
+        window.triggerPrintPDF = function() {
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+            const expenseItems = store.items || [];
+            const incomeItems = store.incomeItems || [];
+
+            const totalExpense = expenseItems.reduce((sum, item) => sum + item.amount, 0);
+            const totalIncome = incomeItems.reduce((sum, item) => sum + item.amount, 0);
+            const netBalance = totalIncome - totalExpense;
+
+            document.getElementById('pdfUserName').innerText = window.userProfile.name;
+            document.getElementById('pdfGeneratedDate').innerText = new Date().toLocaleDateString('bn-BD');
+            document.getElementById('pdfReportMonthTitle').innerText = `${window.selectedMonthKey} এর সম্পূর্ণ স্টেটমেন্ট`;
+
+            document.getElementById('pdfTotalIncome').innerText = window.formatMoney(totalIncome);
+            document.getElementById('pdfTotalExpense').innerText = window.formatMoney(totalExpense);
+            document.getElementById('pdfNetBalance').innerText = window.formatMoney(netBalance);
+
+            // Populate Income
+            const incBody = document.getElementById('pdfIncomeBody');
+            incBody.innerHTML = incomeItems.length === 0 ? 
+                `<tr><td colspan="4" class="p-2 text-center text-slate-400">কোনো তথ্য নেই</td></tr>` :
+                incomeItems.map(i => `<tr><td class="p-2 font-mono text-[11px]">${i.date}</td><td class="p-2 font-semibold">${i.title}</td><td class="p-2">${i.category}</td><td class="p-2 text-right font-bold text-emerald-600">${window.formatMoney(i.amount)}</td></tr>`).join('');
+
+            // Populate Expense
+            const expBody = document.getElementById('pdfExpenseBody');
+            expBody.innerHTML = expenseItems.length === 0 ? 
+                `<tr><td colspan="5" class="p-2 text-center text-slate-400">কোনো তথ্য নেই</td></tr>` :
+                expenseItems.map(i => `<tr><td class="p-2 font-mono text-[11px]">${i.date}</td><td class="p-2 font-semibold">${i.title}</td><td class="p-2">${i.category}</td><td class="p-2">${i.subcategory || '-'}</td><td class="p-2 text-right font-bold text-rose-600">${window.formatMoney(i.amount)}</td></tr>`).join('');
+
+            document.getElementById('pdfModal').classList.remove('hidden');
+        };
+
+        window.closePdfModal = function() {
+            document.getElementById('pdfModal').classList.add('hidden');
+        };
+
+        window.executeBrowserPrint = function() {
+            window.print();
+        };
+
+        // Excel Export Helper
+        window.exportToColorfulExcel = function() {
+            const store = window.monthlyDataStore[window.selectedMonthKey];
+            const expenseItems = store.items || [];
+            const incomeItems = store.incomeItems || [];
+
+            if (expenseItems.length === 0 && incomeItems.length === 0) {
+                alert('এক্সপোর্ট করার জন্য কোনো তথ্য নেই!');
+                return;
+            }
+
+            let totalInc = 0;
+            let totalExp = 0;
+            let rowsHtml = '';
+
+            incomeItems.forEach(item => {
+                totalInc += item.amount;
+                rowsHtml += `
+                    <tr style="background-color: #f0fdf4;">
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #16a34a;">INCOME</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.date}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${item.title}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.category}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">-</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #15803d; text-align: right;">${item.amount}</td>
+                    </tr>
+                `;
+            });
+
+            expenseItems.forEach(item => {
+                totalExp += item.amount;
+                rowsHtml += `
+                    <tr style="background-color: #fff1f2;">
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #e11d48;">EXPENSE</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.date}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${item.title}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.category}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.subcategory || '-'}</td>
+                        <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #be123c; text-align: right;">${item.amount}</td>
+                    </tr>
+                `;
+            });
+
+            const netBalance = totalInc - totalExp;
+
+            const excelTemplate = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8" /></head>
+                <body style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #047857;">CashTrace Financial Statement</h2>
+                    <p style="color: #64748b; font-size: 12px;">Month: ${window.selectedMonthKey} | User: ${window.userProfile.name}</p>
+                    <table style="border-collapse: collapse; width: 100%;">
+                        <thead>
+                            <tr style="background-color: #047857; color: #ffffff; font-weight: bold;">
+                                <th style="padding: 10px; border: 1px solid #047857;">Type</th>
+                                <th style="padding: 10px; border: 1px solid #047857;">Date</th>
+                                <th style="padding: 10px; border: 1px solid #047857;">Title</th>
+                                <th style="padding: 10px; border: 1px solid #047857;">Category</th>
+                                <th style="padding: 10px; border: 1px solid #047857;">Sub-Category</th>
+                                <th style="padding: 10px; border: 1px solid #047857; text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                            <tr><td colspan="6"></td></tr>
+                            <tr style="background-color: #dcfce7; font-weight: bold;">
+                                <td colspan="5" style="padding: 8px; border: 1px solid #cbd5e1; color: #15803d;">TOTAL INCOME</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #15803d;">${totalInc}</td>
+                            </tr>
+                            <tr style="background-color: #ffe4e6; font-weight: bold;">
+                                <td colspan="5" style="padding: 8px; border: 1px solid #cbd5e1; color: #be123c;">TOTAL EXPENSE</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #be123c;">${totalExp}</td>
+                            </tr>
+                            <tr style="background-color: #ccfbf1; font-weight: bold;">
+                                <td colspan="5" style="padding: 10px; border: 1px solid #cbd5e1; color: #047857;">NET BALANCE</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; color: #047857;">${netBalance}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                <script>
+// CashTrace PWA: cache the app shell and its external libraries for offline use.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((error) => {
+      console.warn('CashTrace offline setup could not start:', error);
+    });
+  });
+}
+</script>
+</body>
+                </html>
+            `;
+
+            const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `CashTrace_${window.selectedMonthKey}_Statement.xls`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        };
+
+        // User Profile Update Handler
+        window.updateUserProfile = function(key, value) {
+            window.userProfile[key] = value;
+            window.saveData();
+            window.renderUI();
+        };
+
+        // Toast Notification Helper
+        window.showToast = function(msg) {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = msg;
+            toast.classList.remove('translate-x-full');
+            setTimeout(() => toast.classList.add('translate-x-full'), 2500);
+        };
+
+        // Dark Mode Toggle
+        window.toggleDarkMode = function() {
+            document.documentElement.classList.toggle('dark');
+        };
+    </script>
+</body>
+</html>
